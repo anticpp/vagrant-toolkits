@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]
+then
+  echo "usage: vgrel organization/box-name version"
+  exit 1
+fi
+
+
+cat << EOF
+Vagrant release. Repackage the current VM to package.box, then publish to cloud, and update local box repository.
+Please be sure you have logined to vagrant cloud with \`vagrant cloud auth login\`.
+
+1) vagrant package
+2) vagrant cloud version create <organization/box-name> <version>
+3) vagrant cloud publish <organization/box-name> <version> virtualbox package.box
+4) vagrant cloud version release <organization/box-name> <version>
+5) vagrant box add <organization/box-name>
+
+EOF
+
+cloudbox=$1
+version=$2
+
+echo "Publishing $cloudbox $version"
+vagrant cloud auth whoami
+
+echo -ne "Continue [y/N]: "
+read yesOrNo
+if [ "${yesOrNo}" != "y" ]
+then
+    echo "GoodBye!"
+    exit 1
+fi
+
+
+echo "1) packaging ..."
+vagrant package || exit 1
+
+echo "2) creating version ..."
+vagrant cloud version create $cloudbox $version  || exit 1
+
+echo "3) publishing box to cloud ..."
+vagrant cloud publish -f $cloudbox $version virtualbox package.box  || exit 1
+
+echo "4) releasing version ..."
+vagrant cloud version release -f $cloudbox $version  || exit 1
+
+echo "5) adding new version from cloud ..."
+vagrant box add $cloudbox --box-version $version || exit 1
+
+echo "Cleaning ..."
+rm -fv package.box
+
+echo "Congratulations!"
